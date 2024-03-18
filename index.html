@@ -69,56 +69,6 @@
       <div class="outer">
         <section id="main">
   
-    <article id="post-Git" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
-  <div class="article-meta">
-    <a href="/2024/03/18/Git/" class="article-date">
-  <time class="dt-published" datetime="2024-03-18T03:36:27.826Z" itemprop="datePublished">2024-03-18</time>
-</a>
-    
-  </div>
-  <div class="article-inner">
-    
-    
-    <div class="e-content article-entry" itemprop="articleBody">
-      
-        <h1 id="git"><a href="#git" class="headerlink" title="git"></a>git</h1><p>git init<br>git config –global user.email “<a href="mailto:&#x31;&#x34;&#x34;&#57;&#54;&#x35;&#x38;&#x38;&#52;&#x30;&#x40;&#113;&#113;&#x2e;&#99;&#x6f;&#109;">&#x31;&#x34;&#x34;&#57;&#54;&#x35;&#x38;&#x38;&#52;&#x30;&#x40;&#113;&#113;&#x2e;&#99;&#x6f;&#109;</a>“<br>git config –global user.name “yechunyu”</p>
-<p>查看用户名<br>输入命令：git config user.name</p>
-<p>查看密码<br>git config user.password</p>
-<p>查看邮箱<br>git config user.email</p>
-<p>git remote 查看所有远程仓库<br>git remote xxx 查看指定远程仓库地址<br>git remote rm origin 3.git<br>remote add origin <a target="_blank" rel="noopener" href="http://xxx/john/git_test.git">http://xxx/john/git_test.git</a><br>git remote get-url origin<br>git remote set-url –add origin<br><a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/141941373">Git同时推送多个远程仓库 - 知乎</a></p>
-<p>git add .<br>git commit -m “注释”<br>git pull –rebase origin master(原因：github中的README.md文件可能不在本地代码目录中)<br>git pull origin main<br>git push -u origin main<br>git clone http&#x2F;….&#x2F;.git</p>
-<p>git branch … 创建本地分支<br>git branch <branch_name> <commit_id><br>git branch -d localBranchName 删除本地分支<br>git push origin –delete remoteBranchName 删除远程分支<br>git branch -u origin&#x2F;远程分支 本地分支  &#x2F;&#x2F;关联分支<br>git branch -v 查看分支对应节点<br>git branch -vv 查看本地分支和远程分支关联情况<br>git branch -a<br>git checkout …</p>
-<p>git diff commitformer commitlatter &gt; diffFile.diff</p>
-<p>git reflog<br>git log</p>
-<p>git reset HEAD^   &#x2F;&#x2F; 取消上一次commits更改并将更改保留到工作区<br>git reset HEAD^ –hard   &#x2F;&#x2F; 完全丢弃上一个提交的更改并删除它</p>
-<p>git branch -f master HEAD~3  &#x2F;&#x2F; 将 master 分支强制指向 HEAD 的第 3 级父提交</p>
-<p>git merge branch-name 将分支合并到当前分支</p>
-<p>git stash save – 文件名<br>git stash list<br>git stash apply 索引<br>git stash drop stash@{0}</p>
-<p>git自动身份验证：<br>创建.git-credentials文件vim .git-credentials，输入形如https:&#x2F;&#x2F;{username}:{password}@github.com的配置文本：<a target="_blank" rel="noopener" href="http://root:123456@192.168.20.149/8090">http://root:123456@192.168.20.149/8090</a><br>若有多个，一行一个，:wq保存退出<br>执行命令：git config –global credential.helper store<br>执行命令：cat ~&#x2F;.gitconfig，存在如下内容即代表成功：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">[credential]</span><br><span class="line">helper = store</span><br></pre></td></tr></table></figure>
-<p>再输入一次用户名和密码后都不需要再输入</p>
-<p>git config –global credential.helper cache 每次登陆都输入用户名和密码</p>
-<p>&#x3D;&#x3D;error&#x3D;&#x3D;: src refspec main does not match any<br>原因就是github的仓库中没有<strong>master</strong>这个分支，我们本地的仓库没有<strong>main</strong>分支，那好办，我们将本地仓库的<strong>master</strong>分支改名为<strong>main</strong>分支<br>git branch -m master main</p>
-<p><code>git submodule add &lt;子项目的存储库URL&gt; &lt;子项目目录的相对路径&gt;</code><br><code>git submodule init</code><br><code>git submodule status</code><br><code>git submodule update --recursive</code>：–recursive表示更新主模块时递归更新子模块<br><code>git submodule update --progress</code>：–progress表示在更新时显示进度条<br><code>git rm --cached &lt;Name&gt;</code><br><code>git submodule update --remote &lt;submodule-name&gt;</code></p>
-<p>&#x3D;&#x3D;error&#x3D;&#x3D;：RPC failed; curl 56 GnuTLS recv error<br>解决：设置最大缓存：git config –global http.postBuffer 5000000000</p>
-<p>ssh密钥：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">ssh-keygen -t rsa -b 4096 -C <span class="string">&quot;your github email&quot;</span></span><br><span class="line"></span><br><span class="line">如果自定义了密钥名字：</span><br><span class="line"><span class="built_in">eval</span> <span class="string">&quot;<span class="subst">$(ssh-agent -s)</span>&quot;</span></span><br><span class="line">// 输出：Agent pid 59566</span><br><span class="line">然后，把之前生成的SSH密钥添加到ssh-agent中：</span><br><span class="line">ssh-add ~/.ssh/github_auth</span><br><span class="line">// 输出：Identity added: github_auth (xxxx)</span><br><span class="line"></span><br><span class="line">默认密钥名称：rsa.pub</span><br><span class="line"><span class="built_in">cat</span> ~/.ssh/id_rsa.pub</span><br><span class="line"></span><br><span class="line">复制该内容到github</span><br><span class="line"></span><br><span class="line">// 测试是否成功</span><br><span class="line">ssh -T git@github.com</span><br></pre></td></tr></table></figure>
-
-      
-    </div>
-    <footer class="article-footer">
-      <a data-url="http://example.com/2024/03/18/Git/" data-id="cltweaokd0001gkuy1mn08xfz" data-title="" class="article-share-link"><span class="fa fa-share">Share</span></a>
-      
-      
-      
-    </footer>
-  </div>
-  
-</article>
-
-
-
-  
     <article id="post-Git-Tutorial" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
   <div class="article-meta">
     <a href="/2024/03/18/Git-Tutorial/" class="article-date">
@@ -146,6 +96,66 @@
     </div>
     <footer class="article-footer">
       <a data-url="http://example.com/2024/03/18/Git-Tutorial/" data-id="cltweaok90000gkuy2hy8h5ae" data-title="Git-Tutorial" class="article-share-link"><span class="fa fa-share">Share</span></a>
+      
+      
+      
+    </footer>
+  </div>
+  
+</article>
+
+
+
+  
+    <article id="post-Git" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
+  <div class="article-meta">
+    <a href="/2024/03/18/Git/" class="article-date">
+  <time class="dt-published" datetime="2024-03-18T03:34:13.000Z" itemprop="datePublished">2024-03-18</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="p-name article-title" href="/2024/03/18/Git/">Git-Tutorial</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="e-content article-entry" itemprop="articleBody">
+      
+        <h1 id="git"><a href="#git" class="headerlink" title="git"></a>git</h1><p>git init<br>git config –global user.email “”<br>git config –global user.name “”</p>
+<p>查看用户名<br>输入命令：git config user.name</p>
+<p>查看密码<br>git config user.password</p>
+<p>查看邮箱<br>git config user.email</p>
+<p>git remote 查看所有远程仓库<br>git remote xxx 查看指定远程仓库地址<br>git remote rm origin xxx.git<br>remote add origin xxx.git<br>git remote get-url origin<br>git remote set-url –add origin</p>
+<p>git add .<br>git commit -m “注释”<br>git pull –rebase origin master(原因：github中的README.md文件可能不在本地代码目录中)<br>git pull origin main<br>git push -u origin main<br>git clone http&#x2F;….&#x2F;.git</p>
+<p>git branch … 创建本地分支<br>git branch <branch_name> <commit_id><br>git branch -d localBranchName 删除本地分支<br>git push origin –delete remoteBranchName 删除远程分支<br>git branch -u origin&#x2F;远程分支 本地分支  &#x2F;&#x2F;关联分支<br>git branch -v 查看分支对应节点<br>git branch -vv 查看本地分支和远程分支关联情况<br>git branch -a<br>git checkout …</p>
+<p>git diff commitformer commitlatter &gt; diffFile.diff</p>
+<p>git reflog<br>git log</p>
+<p>git reset HEAD^   &#x2F;&#x2F; 取消上一次commits更改并将更改保留到工作区<br>git reset HEAD^ –hard   &#x2F;&#x2F; 完全丢弃上一个提交的更改并删除它</p>
+<p>git branch -f master HEAD~3  &#x2F;&#x2F; 将 master 分支强制指向 HEAD 的第 3 级父提交</p>
+<p>git merge branch-name 将分支合并到当前分支</p>
+<p>git stash save – 文件名<br>git stash list<br>git stash apply 索引<br>git stash drop stash@{0}</p>
+<p>git自动身份验证：<br>创建.git-credentials文件vim .git-credentials，输入形如https:&#x2F;&#x2F;{username}:{password}@github.com的配置文本：<a target="_blank" rel="noopener" href="http://root:123456@192.168.11.111/8090">http://root:123456@192.168.11.111/8090</a><br>若有多个，一行一个，:wq保存退出<br>执行命令：git config –global credential.helper store<br>执行命令：cat ~&#x2F;.gitconfig，存在如下内容即代表成功：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">[credential]</span><br><span class="line">helper = store</span><br></pre></td></tr></table></figure>
+<p>再输入一次用户名和密码后都不需要再输入</p>
+<p>git config –global credential.helper cache 每次登陆都输入用户名和密码</p>
+<p>&#x3D;&#x3D;error&#x3D;&#x3D;: src refspec main does not match any<br>原因就是github的仓库中没有<strong>master</strong>这个分支，我们本地的仓库没有<strong>main</strong>分支，那好办，我们将本地仓库的<strong>master</strong>分支改名为<strong>main</strong>分支<br>git branch -m master main</p>
+<p><code>git submodule add &lt;子项目的存储库URL&gt; &lt;子项目目录的相对路径&gt;</code><br><code>git submodule init</code><br><code>git submodule status</code><br><code>git submodule update --recursive</code>：–recursive表示更新主模块时递归更新子模块<br><code>git submodule update --progress</code>：–progress表示在更新时显示进度条<br><code>git rm --cached &lt;Name&gt;</code><br><code>git submodule update --remote &lt;submodule-name&gt;</code></p>
+<p>&#x3D;&#x3D;error&#x3D;&#x3D;：RPC failed; curl 56 GnuTLS recv error<br>解决：设置最大缓存：git config –global http.postBuffer 5000000000</p>
+<p>ssh密钥：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">ssh-keygen -t rsa -b 4096 -C <span class="string">&quot;your github email&quot;</span></span><br><span class="line"></span><br><span class="line">如果自定义了密钥名字：</span><br><span class="line"><span class="built_in">eval</span> <span class="string">&quot;<span class="subst">$(ssh-agent -s)</span>&quot;</span></span><br><span class="line">// 输出：Agent pid 59566</span><br><span class="line">然后，把之前生成的SSH密钥添加到ssh-agent中：</span><br><span class="line">ssh-add ~/.ssh/github_auth</span><br><span class="line">// 输出：Identity added: github_auth (xxxx)</span><br><span class="line"></span><br><span class="line">默认密钥名称：rsa.pub</span><br><span class="line"><span class="built_in">cat</span> ~/.ssh/id_rsa.pub</span><br><span class="line"></span><br><span class="line">复制该内容到github</span><br><span class="line"></span><br><span class="line">// 测试是否成功</span><br><span class="line">ssh -T git@github.com</span><br></pre></td></tr></table></figure>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="http://example.com/2024/03/18/Git/" data-id="cltweaokd0001gkuy1mn08xfz" data-title="Git-Tutorial" class="article-share-link"><span class="fa fa-share">Share</span></a>
       
       
       
@@ -239,11 +249,11 @@
       <ul>
         
           <li>
-            <a href="/2024/03/18/Git/">(no title)</a>
+            <a href="/2024/03/18/Git-Tutorial/">Git-Tutorial</a>
           </li>
         
           <li>
-            <a href="/2024/03/18/Git-Tutorial/">Git-Tutorial</a>
+            <a href="/2024/03/18/Git/">Git-Tutorial</a>
           </li>
         
           <li>
