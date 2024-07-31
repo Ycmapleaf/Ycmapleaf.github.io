@@ -8,10 +8,9 @@ wget https://cmake.org/files/v3.24/cmake-3.24.0-linux-x86_64.sh
 sh cmake-3.24.0-linux-x86_64.sh --prefix=/usr/local --exclude-subdir
 ```
 或
-```
-vim ~/.bashrc
+```shell
+wget https://cmake.org/files/v3.24/cmake-3.24.0-linux-x86_64.tar.gz
 export PATH=/root/cmake-3.24.0-linux-x86_64/bin:$PATH
-source ~/.bashrc
 ```
 
 ## CMake
@@ -83,6 +82,10 @@ pkg_check_modules(PNG libpng)
 cmake -G Ninja .. \
     -DLLVM_ENABLE_ASSERTIONS=ON \
     -DCMAKE_BUILD_TYPE=RELEASE\
+
+
+
+
 
 
 
