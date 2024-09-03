@@ -1,0 +1,608 @@
+<!doctype html><html lang=zh-CN><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=robots content="noodp"><title>DFA Packetizer - Ycmapleaf_Blog</title><meta name=Description content="This is YeChunyu's Blog"><meta property="og:url" content="http://example.org/dfa_packetizer/">
+<meta property="og:site_name" content="Ycmapleaf_Blog"><meta property="og:title" content="DFA Packetizer"><meta property="og:description" content="This article is a source code analysis of the LLVM DFAPacketizer"><meta property="og:locale" content="zh_CN"><meta property="og:type" content="article"><meta property="article:section" content="posts"><meta property="article:published_time" content="2024-09-03T11:32:53+08:00"><meta property="article:modified_time" content="2024-09-03T15:14:58+08:00"><meta property="article:tag" content="Note"><meta property="article:tag" content="Llvm-Backend"><meta name=twitter:card content="summary"><meta name=twitter:title content="DFA Packetizer"><meta name=twitter:description content="This article is a source code analysis of the LLVM DFAPacketizer"><meta name=twitter:site content="@xxxx"><meta name=application-name content="My cool site"><meta name=apple-mobile-web-app-title content="My cool site"><meta name=theme-color content="#ffffff"><meta name=msapplication-TileColor content="#da532c"><link rel="shortcut icon" type=image/x-icon href=/favicon.ico><link rel=icon type=image/png sizes=32x32 href=/favicon-32x32.png><link rel=icon type=image/png sizes=16x16 href=/favicon-16x16.png><link rel=apple-touch-icon sizes=180x180 href=/apple-touch-icon.png><link rel=mask-icon href=/safari-pinned-tab.svg color=#5bbad5><link rel=manifest href=/site.webmanifest><link rel=canonical href=http://example.org/dfa_packetizer/><link rel=prev href=http://example.org/software_pipeliner/><link rel=next href=http://example.org/vliw_packetizer/><link rel=stylesheet href=/css/style.min.css><link rel=preload href=/lib/fontawesome-free/all.min.css as=style onload='this.onload=null,this.rel="stylesheet"'><noscript><link rel=stylesheet href=/lib/fontawesome-free/all.min.css></noscript><link rel=preload href=/lib/animate/animate.min.css as=style onload='this.onload=null,this.rel="stylesheet"'><noscript><link rel=stylesheet href=/lib/animate/animate.min.css></noscript><script type=application/ld+json>{"@context":"http://schema.org","@type":"BlogPosting","headline":"DFA Packetizer","inLanguage":"zh-CN","mainEntityOfPage":{"@type":"WebPage","@id":"http:\/\/example.org\/dfa_packetizer\/"},"genre":"posts","keywords":"note, llvm-backend","wordcount":3880,"url":"http:\/\/example.org\/dfa_packetizer\/","datePublished":"2024-09-03T11:32:53+08:00","dateModified":"2024-09-03T15:14:58+08:00","publisher":{"@type":"Organization","name":""},"author":{"@type":"Person","name":"ChunyuYe"},"description":""}</script></head><body data-header-desktop=fixed data-header-mobile=auto><script type=text/javascript>(window.localStorage&&localStorage.getItem("theme")?localStorage.getItem("theme")==="dark":"auto"==="auto"?window.matchMedia("(prefers-color-scheme: dark)").matches:"auto"==="dark")&&document.body.setAttribute("theme","dark")</script><div id=mask></div><div class=wrapper><header class=desktop id=header-desktop><div class=header-wrapper><div class=header-title><a href=/ title=Ycmapleaf_Blog>YCMAPLEAF_BLOG</a></div><div class=menu><div class=menu-inner><a class=menu-item href=/posts/>Posts </a><a class=menu-item href=/tags/>Tags </a><a class=menu-item href=/categories/>Categories </a><span class="menu-item delimiter"></span><span class="menu-item search" id=search-desktop>
+<input type=text placeholder="Search titles or contents..." id=search-input-desktop>
+<a href=javascript:void(0); class="search-button search-toggle" id=search-toggle-desktop title=Search><i class="fas fa-search fa-fw" aria-hidden=true></i>
+</a><a href=javascript:void(0); class="search-button search-clear" id=search-clear-desktop title=Clear><i class="fas fa-times-circle fa-fw" aria-hidden=true></i>
+</a><span class="search-button search-loading" id=search-loading-desktop><i class="fas fa-spinner fa-fw fa-spin" aria-hidden=true></i>
+</span></span><a href=javascript:void(0); class="menu-item theme-switch" title="Switch Theme"><i class="fas fa-adjust fa-fw" aria-hidden=true></i></a></div></div></div></header><header class=mobile id=header-mobile><div class=header-container><div class=header-wrapper><div class=header-title><a href=/ title=Ycmapleaf_Blog>YCMAPLEAF_BLOG</a></div><div class=menu-toggle id=menu-toggle-mobile><span></span><span></span><span></span></div></div><div class=menu id=menu-mobile><div class=search-wrapper><div class="search mobile" id=search-mobile><input type=text placeholder="Search titles or contents..." id=search-input-mobile>
+<a href=javascript:void(0); class="search-button search-toggle" id=search-toggle-mobile title=Search><i class="fas fa-search fa-fw" aria-hidden=true></i>
+</a><a href=javascript:void(0); class="search-button search-clear" id=search-clear-mobile title=Clear><i class="fas fa-times-circle fa-fw" aria-hidden=true></i>
+</a><span class="search-button search-loading" id=search-loading-mobile><i class="fas fa-spinner fa-fw fa-spin" aria-hidden=true></i></span></div><a href=javascript:void(0); class=search-cancel id=search-cancel-mobile>Cancel</a></div><a class=menu-item href=/posts/ title>Posts</a><a class=menu-item href=/tags/ title>Tags</a><a class=menu-item href=/categories/ title>Categories</a><a href=javascript:void(0); class="menu-item theme-switch" title="Switch Theme">
+<i class="fas fa-adjust fa-fw" aria-hidden=true></i></a></div></div></header><div class="search-dropdown desktop"><div id=search-dropdown-desktop></div></div><div class="search-dropdown mobile"><div id=search-dropdown-mobile></div></div><main class=main><div class=container><div class=toc id=toc-auto><h2 class=toc-title>Contents</h2><div class=toc-content id=toc-content-auto></div></div><article class="page single"><h1 class="single-title animate__animated animate__flipInX">DFA Packetizer</h1><div class=post-meta><div class=post-meta-line><span class=post-author><a href=/ title=Author rel=author class=author><i class="fas fa-user-circle fa-fw" aria-hidden=true></i>ChunyuYe</a></span>&nbsp;<span class=post-category>included in <a href=/categories/llvm/><i class="far fa-folder fa-fw" aria-hidden=true></i>LLVM</a></span></div><div class=post-meta-line><i class="far fa-calendar-alt fa-fw" aria-hidden=true></i>&nbsp;<time datetime=2024-09-03>2024-09-03</time>&nbsp;<i class="fas fa-pencil-alt fa-fw" aria-hidden=true></i>&nbsp;3880 words&nbsp;
+<i class="far fa-clock fa-fw" aria-hidden=true></i>&nbsp;8 minutes&nbsp;</div></div><div class="details toc" id=toc-static data-kept><div class="details-summary toc-title"><span>Contents</span>
+<span><i class="details-icon fas fa-angle-right" aria-hidden=true></i></span></div><div class="details-content toc-content" id=toc-content-static><nav id=TableOfContents><ul><li><a href=#defaultvliwscheduler>DefaultVLIWScheduler</a><ul><li><a href=#类定义>类定义</a></li><li><a href=#变量>变量</a><ul><li><a href=#aa>AA</a></li><li><a href=#mutations>Mutations</a></li></ul></li><li><a href=#目标无关函数>目标无关函数</a><ul><li><a href=#defaultvliwscheduler-1>DefaultVLIWScheduler</a></li><li><a href=#schedule>schedule</a></li><li><a href=#addmutation>addMutation</a></li><li><a href=#postprocessdag>postProcessDAG</a></li></ul></li></ul></li><li><a href=#dfapacketizer>DFAPacketizer</a><ul><li><a href=#类定义-1>类定义</a></li><li><a href=#变量-1>变量</a><ul><li><a href=#instritins>InstrItins</a></li><li><a href=#a>A</a></li><li><a href=#itinactions>ItinActions</a></li></ul></li><li><a href=#目标无关函数-1>目标无关函数</a><ul><li><a href=#dfapacketizer-1>DFAPacketizer</a></li><li><a href=#clearresources>clearResources</a></li><li><a href=#settrackresources>setTrackResources</a></li><li><a href=#canreserveresources>canReserveResources</a></li><li><a href=#reserveresources>reserveResources</a></li><li><a href=#getusedresources>getUsedResources</a></li><li><a href=#getinstritins>getInstrItins</a></li></ul></li></ul></li><li><a href=#vliwpacketizerlist>VLIWPacketizerList</a><ul><li><a href=#类定义-2>类定义</a></li><li><a href=#变量-2>变量</a><ul><li><a href=#mf>MF</a></li><li><a href=#tii>TII</a></li><li><a href=#aa-1>AA</a></li><li><a href=#vliwscheduler>VLIWScheduler</a></li><li><a href=#currentpacketmis>CurrentPacketMIs</a></li><li><a href=#resourcetracker>ResourceTracker</a></li><li><a href=#mitosunit>MIToSUnit</a></li></ul></li><li><a href=#目标无关函数-2>目标无关函数</a><ul><li><a href=#vliwpacketizerlist-1>VLIWPacketizerList</a></li><li><a href=#packetizemis>PacketizeMIs</a></li><li><a href=#getresourcetracker>getResourceTracker</a></li><li><a href=#addmutation-1>addMutation</a></li><li><a href=#alias>alias</a></li><li><a href=#alias-1>alias</a></li></ul></li><li><a href=#目标相关函数>目标相关函数</a><ul><li><a href=#vliwpacketizerlist-2>~VLIWPacketizerList()</a></li><li><a href=#addtopacket>addToPacket</a></li><li><a href=#endpacket>endPacket</a></li><li><a href=#initpacketizerstate>initPacketizerState</a></li><li><a href=#ignorepseudoinstruction>ignorePseudoInstruction</a></li><li><a href=#issoloinstruction>isSoloInstruction</a></li><li><a href=#shouldaddtopacket>shouldAddToPacket</a></li><li><a href=#islegaltopacketizetogether>isLegalToPacketizeTogether</a></li><li><a href=#islegaltoprunedependencies>isLegalToPruneDependencies</a></li></ul></li></ul></li></ul></nav></div></div><div class=content id=content><p><strong>本文章为LLVM DFAPacketizer的源码分析。</strong></p><p>相关文件路径</p><ul><li>llvm/include/llvm/CodeGen/DFAPacketizer.h</li><li>llvm/lib/CodeGen/DFAPacketizer.cpp</li></ul><p>一个确定性有限自动机（DFA）由三个主要元素组成：状态（states）、输入（inputs）和转换（transitions）。对于打包机制来说，输入是目标指令类集合。状态模拟了在给定指令包中所有可能的功能单元消耗组合。转换模拟了将指令添加到指令包中的过程。在这个类构建的确定性有限自动机中，如果一个指令可以被添加到指令包中，那么就存在一个有效的从相应状态出发的转换。无效的转换表明该指令不能被添加到当前的指令包中。</p><p>DFAPacketizer定义三个类<code>DefaultVLIWScheduler</code>、<code>DFAPacketizer</code>、<code>VLIWPacketizerList</code>。</p><h2 id=defaultvliwscheduler>DefaultVLIWScheduler</h2><p>构建依赖图。</p><h3 id=类定义>类定义</h3><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span><span class=lnt>19
+</span><span class=lnt>20
+</span><span class=lnt>21
+</span><span class=lnt>22
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-cpp data-lang=cpp><span class=line><span class=cl><span class=c1>// 这个类扩展了 ScheduleDAGInstrs，并覆盖了 schedule 方法以构建依赖图。
+</span></span></span><span class=line><span class=cl><span class=c1></span><span class=k>class</span> <span class=nc>DefaultVLIWScheduler</span> <span class=o>:</span> <span class=k>public</span> <span class=n>ScheduleDAGInstrs</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl><span class=k>private</span><span class=o>:</span>
+</span></span><span class=line><span class=cl>  <span class=n>AAResults</span> <span class=o>*</span><span class=n>AA</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>  <span class=c1>// DAG 后处理步骤的有序列表。
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=n>std</span><span class=o>::</span><span class=n>vector</span><span class=o>&lt;</span><span class=n>std</span><span class=o>::</span><span class=n>unique_ptr</span><span class=o>&lt;</span><span class=n>ScheduleDAGMutation</span><span class=o>&gt;&gt;</span> <span class=n>Mutations</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=k>public</span><span class=o>:</span>
+</span></span><span class=line><span class=cl>  <span class=n>DefaultVLIWScheduler</span><span class=p>(</span><span class=n>MachineFunction</span> <span class=o>&amp;</span><span class=n>MF</span><span class=p>,</span> <span class=n>MachineLoopInfo</span> <span class=o>&amp;</span><span class=n>MLI</span><span class=p>,</span>
+</span></span><span class=line><span class=cl>                       <span class=n>AAResults</span> <span class=o>*</span><span class=n>AA</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>  <span class=c1>// 调度。
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=kt>void</span> <span class=nf>schedule</span><span class=p>()</span> <span class=k>override</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>  <span class=c1>// DefaultVLIWScheduler拥有突变对象的所有权。
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=kt>void</span> <span class=nf>addMutation</span><span class=p>(</span><span class=n>std</span><span class=o>::</span><span class=n>unique_ptr</span><span class=o>&lt;</span><span class=n>ScheduleDAGMutation</span><span class=o>&gt;</span> <span class=n>Mutation</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>    <span class=n>Mutations</span><span class=p>.</span><span class=n>push_back</span><span class=p>(</span><span class=n>std</span><span class=o>::</span><span class=n>move</span><span class=p>(</span><span class=n>Mutation</span><span class=p>));</span>
+</span></span><span class=line><span class=cl>  <span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=k>protected</span><span class=o>:</span>
+</span></span><span class=line><span class=cl>  <span class=kt>void</span> <span class=n>postProcessDAG</span><span class=p>();</span>
+</span></span><span class=line><span class=cl><span class=p>};</span>
+</span></span></code></pre></td></tr></table></div></div><h3 id=变量>变量</h3><h4 id=aa>AA</h4><p>别名分析。</p><p><code>AAResults *AA</code></p><h4 id=mutations>Mutations</h4><p>存储DAG后处理阶段的有序列表。</p><p><code>std::vector&lt;std::unique_ptr&lt;ScheduleDAGMutation>> Mutations</code></p><ul><li>ScheduleDAGMutation在DAG构建后为针对调度的依赖图的目标特定变异（llvm/include/llvm/CodeGen/ScheduleDAGMutation.h）。</li></ul><h3 id=目标无关函数>目标无关函数</h3><h4 id=defaultvliwscheduler-1>DefaultVLIWScheduler</h4><p>构造函数。</p><h4 id=schedule>schedule</h4><p>调度工作。</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span><span class=lnt>6
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-cpp data-lang=cpp><span class=line><span class=cl><span class=kt>void</span> <span class=n>DefaultVLIWScheduler</span><span class=o>::</span><span class=n>schedule</span><span class=p>()</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>  <span class=c1>// 构建调度图
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=c1>// llvm/lib/CodeGen/ScheduleDAGInstrs.cpp
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=n>buildSchedGraph</span><span class=p>(</span><span class=n>AA</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>  <span class=n>postProcessDAG</span><span class=p>();</span>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span></code></pre></td></tr></table></div></div><h4 id=addmutation>addMutation</h4><p>添加异变对象。</p><h4 id=postprocessdag>postProcessDAG</h4><p>DAG后处理。</p><h2 id=dfapacketizer>DFAPacketizer</h2><p>该类进行资源管理以及自动机操作。</p><h3 id=类定义-1>类定义</h3><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span><span class=lnt>19
+</span><span class=lnt>20
+</span><span class=lnt>21
+</span><span class=lnt>22
+</span><span class=lnt>23
+</span><span class=lnt>24
+</span><span class=lnt>25
+</span><span class=lnt>26
+</span><span class=lnt>27
+</span><span class=lnt>28
+</span><span class=lnt>29
+</span><span class=lnt>30
+</span><span class=lnt>31
+</span><span class=lnt>32
+</span><span class=lnt>33
+</span><span class=lnt>34
+</span><span class=lnt>35
+</span><span class=lnt>36
+</span><span class=lnt>37
+</span><span class=lnt>38
+</span><span class=lnt>39
+</span><span class=lnt>40
+</span><span class=lnt>41
+</span><span class=lnt>42
+</span><span class=lnt>43
+</span><span class=lnt>44
+</span><span class=lnt>45
+</span><span class=lnt>46
+</span><span class=lnt>47
+</span><span class=lnt>48
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-cpp data-lang=cpp><span class=line><span class=cl><span class=k>class</span> <span class=nc>DFAPacketizer</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl><span class=k>private</span><span class=o>:</span>
+</span></span><span class=line><span class=cl>  <span class=k>const</span> <span class=n>InstrItineraryData</span> <span class=o>*</span><span class=n>InstrItins</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>  <span class=c1>// 自动机
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=n>Automaton</span><span class=o>&lt;</span><span class=kt>uint64_t</span><span class=o>&gt;</span> <span class=n>A</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>  <span class=c1>// 对于每条调度，都有一个应用于自动机的“行为”。这消除了行程类别之间动作的冗余。
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=n>ArrayRef</span><span class=o>&lt;</span><span class=kt>unsigned</span><span class=o>&gt;</span> <span class=n>ItinActions</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=k>public</span><span class=o>:</span>
+</span></span><span class=line><span class=cl>  <span class=n>DFAPacketizer</span><span class=p>(</span><span class=k>const</span> <span class=n>InstrItineraryData</span> <span class=o>*</span><span class=n>InstrItins</span><span class=p>,</span> <span class=n>Automaton</span><span class=o>&lt;</span><span class=kt>uint64_t</span><span class=o>&gt;</span> <span class=n>a</span><span class=p>,</span>
+</span></span><span class=line><span class=cl>                <span class=n>ArrayRef</span><span class=o>&lt;</span><span class=kt>unsigned</span><span class=o>&gt;</span> <span class=n>ItinActions</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>      <span class=o>:</span> <span class=n>InstrItins</span><span class=p>(</span><span class=n>InstrItins</span><span class=p>),</span> <span class=n>A</span><span class=p>(</span><span class=n>std</span><span class=o>::</span><span class=n>move</span><span class=p>(</span><span class=n>a</span><span class=p>)),</span> <span class=n>ItinActions</span><span class=p>(</span><span class=n>ItinActions</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>    <span class=c1>// 开始时禁用资源跟踪功能。
+</span></span></span><span class=line><span class=cl><span class=c1></span>    <span class=n>A</span><span class=p>.</span><span class=n>enableTranscription</span><span class=p>(</span><span class=nb>false</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>  <span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>  <span class=c1>// 重置当前状态，另所有资源可获取
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=kt>void</span> <span class=nf>clearResources</span><span class=p>()</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>    <span class=n>A</span><span class=p>.</span><span class=n>reset</span><span class=p>();</span>
+</span></span><span class=line><span class=cl>  <span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>  <span class=c1>// 设置这个打包器是否不仅应该跟踪指令是否可以打包，
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=c1>// 而且还要跟踪在打包之后每条指令最终使用哪些功能单元。
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=kt>void</span> <span class=nf>setTrackResources</span><span class=p>(</span><span class=kt>bool</span> <span class=n>Track</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>    <span class=n>A</span><span class=p>.</span><span class=n>enableTranscription</span><span class=p>(</span><span class=n>Track</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>  <span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>  <span class=c1>// 检查当前状态下MCInstrDesc占用的资源是否可用。
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=kt>bool</span> <span class=nf>canReserveResources</span><span class=p>(</span><span class=k>const</span> <span class=n>MCInstrDesc</span> <span class=o>*</span><span class=n>MID</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>  <span class=c1>// 预留MCInstrDesc占用的资源，并改变当前状态以反映这一变化。
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=kt>void</span> <span class=nf>reserveResources</span><span class=p>(</span><span class=k>const</span> <span class=n>MCInstrDesc</span> <span class=o>*</span><span class=n>MID</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>  <span class=c1>// 检查机器指令占用的资源在当前状态下是否可用。
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=kt>bool</span> <span class=nf>canReserveResources</span><span class=p>(</span><span class=n>MachineInstr</span> <span class=o>&amp;</span><span class=n>MI</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>  <span class=c1>// 预留机器指令占用的资源，并更新当前状态以反映这一变化。
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=kt>void</span> <span class=nf>reserveResources</span><span class=p>(</span><span class=n>MachineInstr</span> <span class=o>&amp;</span><span class=n>MI</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>  <span class=c1>// 返回添加到这个数据包中的第InstIdx条指令所使用的资源。
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=c1>// 资源以功能单元的位向量形式返回。 
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=c1>// 注意，一个指令束可能有多种有效的打包方式。这个函数返回一种任意有效的打包。
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=c1>// 需要先调用setTrackResources(true)。
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=kt>unsigned</span> <span class=nf>getUsedResources</span><span class=p>(</span><span class=kt>unsigned</span> <span class=n>InstIdx</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>  <span class=c1>// 获取子目标提供的供目标使用的调度数据。
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=k>const</span> <span class=n>InstrItineraryData</span> <span class=o>*</span><span class=nf>getInstrItins</span><span class=p>()</span> <span class=k>const</span> <span class=p>{</span> <span class=k>return</span> <span class=n>InstrItins</span><span class=p>;</span> <span class=p>}</span>
+</span></span><span class=line><span class=cl><span class=p>};</span>
+</span></span></code></pre></td></tr></table></div></div><h3 id=变量-1>变量</h3><h4 id=instritins>InstrItins</h4><p>调度数据。</p><p><code>const InstrItineraryData *InstrItins</code></p><h4 id=a>A</h4><p>自动机。</p><p><code>Automaton&lt;uint64_t> A</code></p><h4 id=itinactions>ItinActions</h4><p>调度行为。</p><p><code>ArrayRef&lt;unsigned> ItinActions</code></p><h3 id=目标无关函数-1>目标无关函数</h3><h4 id=dfapacketizer-1>DFAPacketizer</h4><p>构造函数。
+开启自动机A的转录功能（Transcription）。</p><h4 id=clearresources>clearResources</h4><p>重置自动机A，使所有资源可获取。</p><h4 id=settrackresources>setTrackResources</h4><p>根据Track设置自动机A是否转录，表示除考虑打包外还应考虑功能单元的应用。</p><h4 id=canreserveresources>canReserveResources</h4><p>1.<code>canReserveResources(const MCInstrDesc *MID)</code>: 检查被一个MCInstrDesc占用的资源是否可获取。</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span><span class=lnt>6
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-cpp data-lang=cpp><span class=line><span class=cl><span class=kt>bool</span> <span class=n>DFAPacketizer</span><span class=o>::</span><span class=n>canReserveResources</span><span class=p>(</span><span class=k>const</span> <span class=n>MCInstrDesc</span> <span class=o>*</span><span class=n>MID</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>  <span class=kt>unsigned</span> <span class=n>Action</span> <span class=o>=</span> <span class=n>ItinActions</span><span class=p>[</span><span class=n>MID</span><span class=o>-&gt;</span><span class=n>getSchedClass</span><span class=p>()];</span>
+</span></span><span class=line><span class=cl>  <span class=k>if</span> <span class=p>(</span><span class=n>MID</span><span class=o>-&gt;</span><span class=n>getSchedClass</span><span class=p>()</span> <span class=o>==</span> <span class=mi>0</span> <span class=o>||</span> <span class=n>Action</span> <span class=o>==</span> <span class=mi>0</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>    <span class=k>return</span> <span class=nb>false</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>  <span class=k>return</span> <span class=n>A</span><span class=p>.</span><span class=n>canAdd</span><span class=p>(</span><span class=n>Action</span><span class=p>);</span>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span></code></pre></td></tr></table></div></div><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-cpp data-lang=cpp><span class=line><span class=cl><span class=c1>// llvm/include/llvm/Support/Automaton.h
+</span></span></span><span class=line><span class=cl><span class=c1></span><span class=kt>bool</span> <span class=nf>canAdd</span><span class=p>(</span><span class=k>const</span> <span class=n>ActionT</span> <span class=o>&amp;</span><span class=n>A</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>	<span class=k>auto</span> <span class=n>I</span> <span class=o>=</span> <span class=n>M</span><span class=o>-&gt;</span><span class=n>find</span><span class=p>({</span><span class=n>State</span><span class=p>,</span> <span class=n>A</span><span class=p>});</span>
+</span></span><span class=line><span class=cl>	<span class=k>return</span> <span class=n>I</span> <span class=o>!=</span> <span class=n>M</span><span class=o>-&gt;</span><span class=n>end</span><span class=p>();</span>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span></code></pre></td></tr></table></div></div><ul><li>根据MID获取调度类别。</li><li>根据调度类别获取调度行为。</li><li>如果没有调度类别或调度行为，结束。</li><li>否则使用自动机A确定调度行为是否可以被转换。</li></ul><p>getSchedClass获取该指令的调度类别，其结果为<a href=InstrItineraryData.md rel>InstrItineraryData</a>表的索引。</p><p>2.<code>canReserveResources(MachineInstr &amp;MI)</code>: 检查MachineInstr占用的资源在当前状态下是否可用。</p><p>该方法调用<code>canReserveResources(const MCInstrDesc *MID)</code>。</p><h4 id=reserveresources>reserveResources</h4><p>1.<code>reserveResources(const MCInstrDesc *MID)</code>: 预留MCInstrDesc占用的资源，并改变当前状态以反映这一变化。</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span><span class=lnt>6
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-cpp data-lang=cpp><span class=line><span class=cl><span class=kt>void</span> <span class=n>DFAPacketizer</span><span class=o>::</span><span class=n>reserveResources</span><span class=p>(</span><span class=k>const</span> <span class=n>MCInstrDesc</span> <span class=o>*</span><span class=n>MID</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>	<span class=kt>unsigned</span> <span class=n>Action</span> <span class=o>=</span> <span class=n>ItinActions</span><span class=p>[</span><span class=n>MID</span><span class=o>-&gt;</span><span class=n>getSchedClass</span><span class=p>()];</span>
+</span></span><span class=line><span class=cl>	<span class=k>if</span> <span class=p>(</span><span class=n>MID</span><span class=o>-&gt;</span><span class=n>getSchedClass</span><span class=p>()</span> <span class=o>==</span> <span class=mi>0</span> <span class=o>||</span> <span class=n>Action</span> <span class=o>==</span> <span class=mi>0</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>		<span class=k>return</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>	<span class=n>A</span><span class=p>.</span><span class=n>add</span><span class=p>(</span><span class=n>Action</span><span class=p>);</span>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span></code></pre></td></tr></table></div></div><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-cpp data-lang=cpp><span class=line><span class=cl><span class=c1>// llvm/include/llvm/Support/Automaton.h
+</span></span></span><span class=line><span class=cl><span class=c1></span><span class=kt>bool</span> <span class=nf>add</span><span class=p>(</span><span class=k>const</span> <span class=n>ActionT</span> <span class=o>&amp;</span><span class=n>A</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>	<span class=k>auto</span> <span class=n>I</span> <span class=o>=</span> <span class=n>M</span><span class=o>-&gt;</span><span class=n>find</span><span class=p>({</span><span class=n>State</span><span class=p>,</span> <span class=n>A</span><span class=p>});</span>
+</span></span><span class=line><span class=cl>	<span class=k>if</span> <span class=p>(</span><span class=n>I</span> <span class=o>==</span> <span class=n>M</span><span class=o>-&gt;</span><span class=n>end</span><span class=p>())</span>
+</span></span><span class=line><span class=cl>	  <span class=k>return</span> <span class=nb>false</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>	<span class=k>if</span> <span class=p>(</span><span class=n>Transcriber</span> <span class=o>&amp;&amp;</span> <span class=n>Transcribe</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>	  <span class=n>Transcriber</span><span class=o>-&gt;</span><span class=n>transition</span><span class=p>(</span><span class=n>I</span><span class=o>-&gt;</span><span class=n>second</span><span class=p>.</span><span class=n>second</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>	<span class=n>State</span> <span class=o>=</span> <span class=n>I</span><span class=o>-&gt;</span><span class=n>second</span><span class=p>.</span><span class=n>first</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>	<span class=k>return</span> <span class=nb>true</span><span class=p>;</span>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span></code></pre></td></tr></table></div></div><ul><li>根据MID获取调度类别。</li><li>根据调度类别获取调度行为。</li><li>如果没有调度类别或调度行为，结束。</li><li>否则将该行为添加到自动机A中。</li></ul><p>2.<code>reserveResources(MachineInstr &amp;MI)</code>: 预留MachineInstr占用的资源，并更新当前状态以反映这一变化。</p><p>该方法调用<code>reserveResources(const MCInstrDesc *MID)</code>。</p><h4 id=getusedresources>getUsedResources</h4><p>返回添加到这个数据包中的第InstIdx条指令所使用的资源，资源以功能单元的位向量形式返回。注意，一个指令束可能有多种有效的打包方式。这个函数返回一种任意有效的打包。需要先调用setTrackResources(true)。</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-cpp data-lang=cpp><span class=line><span class=cl><span class=kt>unsigned</span> <span class=n>DFAPacketizer</span><span class=o>::</span><span class=n>getUsedResources</span><span class=p>(</span><span class=kt>unsigned</span> <span class=n>InstIdx</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>  <span class=n>ArrayRef</span><span class=o>&lt;</span><span class=n>NfaPath</span><span class=o>&gt;</span> <span class=n>NfaPaths</span> <span class=o>=</span> <span class=n>A</span><span class=p>.</span><span class=n>getNfaPaths</span><span class=p>();</span>
+</span></span><span class=line><span class=cl>  <span class=n>assert</span><span class=p>(</span><span class=o>!</span><span class=n>NfaPaths</span><span class=p>.</span><span class=n>empty</span><span class=p>()</span> <span class=o>&amp;&amp;</span> <span class=s>&#34;Invalid bundle!&#34;</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>  <span class=k>const</span> <span class=n>NfaPath</span> <span class=o>&amp;</span><span class=n>RS</span> <span class=o>=</span> <span class=n>NfaPaths</span><span class=p>.</span><span class=n>front</span><span class=p>();</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>  <span class=c1>// RS stores the cumulative resources used up to and including the I&#39;th
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=c1>// instruction. The 0th instruction is the base case.
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=k>if</span> <span class=p>(</span><span class=n>InstIdx</span> <span class=o>==</span> <span class=mi>0</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>    <span class=k>return</span> <span class=n>RS</span><span class=p>[</span><span class=mi>0</span><span class=p>];</span>
+</span></span><span class=line><span class=cl>  <span class=c1>// Return the difference between the cumulative resources used by InstIdx and
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=c1>// its predecessor.
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=k>return</span> <span class=n>RS</span><span class=p>[</span><span class=n>InstIdx</span><span class=p>]</span> <span class=o>^</span> <span class=n>RS</span><span class=p>[</span><span class=n>InstIdx</span> <span class=o>-</span> <span class=mi>1</span><span class=p>];</span>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span></code></pre></td></tr></table></div></div><h4 id=getinstritins>getInstrItins</h4><p>获取子目标提供的供目标使用的调度数据</p><h2 id=vliwpacketizerlist>VLIWPacketizerList</h2><p>VLIWPacketizerList 实现了一个使用 DFA（确定性有限自动机）的简单 VLIW 指令打包器。该打包器在机器基本块上工作。对于 BB（基本块）中的每条指令 I，打包器会查询 DFA 来看是否有足够的机器资源来执行 I。如果是这样，打包器会检查 I 是否依赖当前数据包中的任何指令。如果没有发现依赖关系，I 就会被添加到当前数据包中，并且相应的机器资源会被标记为已占用。如果发现了依赖关系，就会进行目标 API 调用以剪枝依赖。</p><h3 id=类定义-2>类定义</h3><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span><span class=lnt>19
+</span><span class=lnt>20
+</span><span class=lnt>21
+</span><span class=lnt>22
+</span><span class=lnt>23
+</span><span class=lnt>24
+</span><span class=lnt>25
+</span><span class=lnt>26
+</span><span class=lnt>27
+</span><span class=lnt>28
+</span><span class=lnt>29
+</span><span class=lnt>30
+</span><span class=lnt>31
+</span><span class=lnt>32
+</span><span class=lnt>33
+</span><span class=lnt>34
+</span><span class=lnt>35
+</span><span class=lnt>36
+</span><span class=lnt>37
+</span><span class=lnt>38
+</span><span class=lnt>39
+</span><span class=lnt>40
+</span><span class=lnt>41
+</span><span class=lnt>42
+</span><span class=lnt>43
+</span><span class=lnt>44
+</span><span class=lnt>45
+</span><span class=lnt>46
+</span><span class=lnt>47
+</span><span class=lnt>48
+</span><span class=lnt>49
+</span><span class=lnt>50
+</span><span class=lnt>51
+</span><span class=lnt>52
+</span><span class=lnt>53
+</span><span class=lnt>54
+</span><span class=lnt>55
+</span><span class=lnt>56
+</span><span class=lnt>57
+</span><span class=lnt>58
+</span><span class=lnt>59
+</span><span class=lnt>60
+</span><span class=lnt>61
+</span><span class=lnt>62
+</span><span class=lnt>63
+</span><span class=lnt>64
+</span><span class=lnt>65
+</span><span class=lnt>66
+</span><span class=lnt>67
+</span><span class=lnt>68
+</span><span class=lnt>69
+</span><span class=lnt>70
+</span><span class=lnt>71
+</span><span class=lnt>72
+</span><span class=lnt>73
+</span><span class=lnt>74
+</span><span class=lnt>75
+</span><span class=lnt>76
+</span><span class=lnt>77
+</span><span class=lnt>78
+</span><span class=lnt>79
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-cpp data-lang=cpp><span class=line><span class=cl><span class=k>class</span> <span class=nc>VLIWPacketizerList</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl><span class=k>protected</span><span class=o>:</span>
+</span></span><span class=line><span class=cl>  <span class=n>MachineFunction</span> <span class=o>&amp;</span><span class=n>MF</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>  <span class=k>const</span> <span class=n>TargetInstrInfo</span> <span class=o>*</span><span class=n>TII</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>  <span class=n>AAResults</span> <span class=o>*</span><span class=n>AA</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>  <span class=c1>// VLIW调度器
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=n>DefaultVLIWScheduler</span> <span class=o>*</span><span class=n>VLIWScheduler</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>  <span class=c1>// 当前数据包包含的指令。
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=n>std</span><span class=o>::</span><span class=n>vector</span><span class=o>&lt;</span><span class=n>MachineInstr</span><span class=o>*&gt;</span> <span class=n>CurrentPacketMIs</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>  <span class=c1>// DFA资源追踪器。
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=n>DFAPacketizer</span> <span class=o>*</span><span class=n>ResourceTracker</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>  <span class=c1>// 指令到功能单元的映射。
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=n>std</span><span class=o>::</span><span class=n>map</span><span class=o>&lt;</span><span class=n>MachineInstr</span><span class=o>*</span><span class=p>,</span> <span class=n>SUnit</span><span class=o>*&gt;</span> <span class=n>MIToSUnit</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=k>public</span><span class=o>:</span>
+</span></span><span class=line><span class=cl>  <span class=c1>// 构造函数，AAResults参数可以为空指针。
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=n>VLIWPacketizerList</span><span class=p>(</span><span class=n>MachineFunction</span> <span class=o>&amp;</span><span class=n>MF</span><span class=p>,</span> <span class=n>MachineLoopInfo</span> <span class=o>&amp;</span><span class=n>MLI</span><span class=p>,</span>
+</span></span><span class=line><span class=cl>                     <span class=n>AAResults</span> <span class=o>*</span><span class=n>AA</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>  <span class=k>virtual</span> <span class=o>~</span><span class=n>VLIWPacketizerList</span><span class=p>();</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>  <span class=c1>// 指令打包接口。
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=kt>void</span> <span class=nf>PacketizeMIs</span><span class=p>(</span><span class=n>MachineBasicBlock</span> <span class=o>*</span><span class=n>MBB</span><span class=p>,</span>
+</span></span><span class=line><span class=cl>                    <span class=n>MachineBasicBlock</span><span class=o>::</span><span class=n>iterator</span> <span class=n>BeginItr</span><span class=p>,</span>
+</span></span><span class=line><span class=cl>                    <span class=n>MachineBasicBlock</span><span class=o>::</span><span class=n>iterator</span> <span class=n>EndItr</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>  <span class=c1>// 返回ResourceTracker。
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=n>DFAPacketizer</span> <span class=o>*</span><span class=nf>getResourceTracker</span><span class=p>()</span> <span class=p>{</span><span class=k>return</span> <span class=n>ResourceTracker</span><span class=p>;}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>  <span class=c1>// 添加指令到当前包。
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=k>virtual</span> <span class=n>MachineBasicBlock</span><span class=o>::</span><span class=n>iterator</span> <span class=n>addToPacket</span><span class=p>(</span><span class=n>MachineInstr</span> <span class=o>&amp;</span><span class=n>MI</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>    <span class=n>CurrentPacketMIs</span><span class=p>.</span><span class=n>push_back</span><span class=p>(</span><span class=o>&amp;</span><span class=n>MI</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>    <span class=n>ResourceTracker</span><span class=o>-&gt;</span><span class=n>reserveResources</span><span class=p>(</span><span class=n>MI</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>    <span class=k>return</span> <span class=n>MI</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>  <span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>  <span class=c1>// 结束当前打包并且重置打包器的状态。
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=c1>// 覆盖当前函数允许确切目标打包器执行自定义最终处理。
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=k>virtual</span> <span class=kt>void</span> <span class=nf>endPacket</span><span class=p>(</span><span class=n>MachineBasicBlock</span> <span class=o>*</span><span class=n>MBB</span><span class=p>,</span>
+</span></span><span class=line><span class=cl>                         <span class=n>MachineBasicBlock</span><span class=o>::</span><span class=n>iterator</span> <span class=n>MI</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>  <span class=c1>// 在将指令打包之前执行初始化。该函数应由依赖于目标的打包器覆盖。
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=k>virtual</span> <span class=kt>void</span> <span class=nf>initPacketizerState</span><span class=p>()</span> <span class=p>{}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>  <span class=c1>// 检查是否给定的指令应当被打包器忽视。
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=k>virtual</span> <span class=kt>bool</span> <span class=nf>ignorePseudoInstruction</span><span class=p>(</span><span class=k>const</span> <span class=n>MachineInstr</span> <span class=o>&amp;</span><span class=n>I</span><span class=p>,</span>
+</span></span><span class=line><span class=cl>                                       <span class=k>const</span> <span class=n>MachineBasicBlock</span> <span class=o>*</span><span class=n>MBB</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>    <span class=k>return</span> <span class=nb>false</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>  <span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>  <span class=c1>// 若当前指令不能和任意一个指令打包，则返回true，这意味着当前指令独自为一个包。
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=k>virtual</span> <span class=kt>bool</span> <span class=nf>isSoloInstruction</span><span class=p>(</span><span class=k>const</span> <span class=n>MachineInstr</span> <span class=o>&amp;</span><span class=n>MI</span><span class=p>)</span> <span class=p>{</span> <span class=k>return</span> <span class=nb>true</span><span class=p>;</span> <span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>  <span class=c1>// 检查打包器是否应该尝试将给定的指令添加到当前数据包中。
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=c1>// 可能不希望将指令包含在当前数据包中的原因之一是，它可能导致停滞。 
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=c1>// 如果这个函数返回 &#34;false&#34;，则当前数据包将结束，并且该指令将被添加到下一个数据包中。
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=k>virtual</span> <span class=kt>bool</span> <span class=nf>shouldAddToPacket</span><span class=p>(</span><span class=k>const</span> <span class=n>MachineInstr</span> <span class=o>&amp;</span><span class=n>MI</span><span class=p>)</span> <span class=p>{</span> <span class=k>return</span> <span class=nb>true</span><span class=p>;</span> <span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>  <span class=c1>// 检查将 SUI 和 SUJ 打包在一起是否合法。
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=k>virtual</span> <span class=kt>bool</span> <span class=nf>isLegalToPacketizeTogether</span><span class=p>(</span><span class=n>SUnit</span> <span class=o>*</span><span class=n>SUI</span><span class=p>,</span> <span class=n>SUnit</span> <span class=o>*</span><span class=n>SUJ</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>    <span class=k>return</span> <span class=nb>false</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>  <span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>  <span class=c1>// 检查在 SUI 和 SUJ 之间剪枝是否合法。
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=k>virtual</span> <span class=kt>bool</span> <span class=nf>isLegalToPruneDependencies</span><span class=p>(</span><span class=n>SUnit</span> <span class=o>*</span><span class=n>SUI</span><span class=p>,</span> <span class=n>SUnit</span> <span class=o>*</span><span class=n>SUJ</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>    <span class=k>return</span> <span class=nb>false</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>  <span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>  <span class=c1>// 在打包开始前，增加一次 DAG 突变。
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=kt>void</span> <span class=nf>addMutation</span><span class=p>(</span><span class=n>std</span><span class=o>::</span><span class=n>unique_ptr</span><span class=o>&lt;</span><span class=n>ScheduleDAGMutation</span><span class=o>&gt;</span> <span class=n>Mutation</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>  <span class=kt>bool</span> <span class=nf>alias</span><span class=p>(</span><span class=k>const</span> <span class=n>MachineInstr</span> <span class=o>&amp;</span><span class=n>MI1</span><span class=p>,</span> <span class=k>const</span> <span class=n>MachineInstr</span> <span class=o>&amp;</span><span class=n>MI2</span><span class=p>,</span>
+</span></span><span class=line><span class=cl>             <span class=kt>bool</span> <span class=n>UseTBAA</span> <span class=o>=</span> <span class=nb>true</span><span class=p>)</span> <span class=k>const</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=k>private</span><span class=o>:</span>
+</span></span><span class=line><span class=cl>  <span class=kt>bool</span> <span class=n>alias</span><span class=p>(</span><span class=k>const</span> <span class=n>MachineMemOperand</span> <span class=o>&amp;</span><span class=n>Op1</span><span class=p>,</span> <span class=k>const</span> <span class=n>MachineMemOperand</span> <span class=o>&amp;</span><span class=n>Op2</span><span class=p>,</span>
+</span></span><span class=line><span class=cl>             <span class=kt>bool</span> <span class=n>UseTBAA</span> <span class=o>=</span> <span class=nb>true</span><span class=p>)</span> <span class=k>const</span><span class=p>;</span>
+</span></span><span class=line><span class=cl><span class=p>};</span>
+</span></span></code></pre></td></tr></table></div></div><h3 id=变量-2>变量</h3><h4 id=mf>MF</h4><p><code>MachineFunction &amp;MF</code></p><h4 id=tii>TII</h4><p>目标指令信息。</p><p><code>const TargetInstrInfo *TII</code></p><h4 id=aa-1>AA</h4><p>别名分析。</p><p><code>AAResults *AA</code></p><h4 id=vliwscheduler>VLIWScheduler</h4><p>VLIW调度器。</p><p><code>DefaultVLIWScheduler *VLIWScheduler</code></p><h4 id=currentpacketmis>CurrentPacketMIs</h4><p>当前数据包包含的指令</p><p><code>std::vector&lt;MachineInstr*> CurrentPacketMIs</code></p><h4 id=resourcetracker>ResourceTracker</h4><p>DFA资源追踪器。</p><p><code>DFAPacketizer *ResourceTracker</code></p><h4 id=mitosunit>MIToSUnit</h4><p>指令到功能单元的映射关系。</p><p><code>std::map&lt;MachineInstr*, SUnit*> MIToSUnit</code></p><h3 id=目标无关函数-2>目标无关函数</h3><h4 id=vliwpacketizerlist-1>VLIWPacketizerList</h4><p>构造函数，AAResults参数可以为空指针。</p><h4 id=packetizemis>PacketizeMIs</h4><p>指令打包接口。</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>  1
+</span><span class=lnt>  2
+</span><span class=lnt>  3
+</span><span class=lnt>  4
+</span><span class=lnt>  5
+</span><span class=lnt>  6
+</span><span class=lnt>  7
+</span><span class=lnt>  8
+</span><span class=lnt>  9
+</span><span class=lnt> 10
+</span><span class=lnt> 11
+</span><span class=lnt> 12
+</span><span class=lnt> 13
+</span><span class=lnt> 14
+</span><span class=lnt> 15
+</span><span class=lnt> 16
+</span><span class=lnt> 17
+</span><span class=lnt> 18
+</span><span class=lnt> 19
+</span><span class=lnt> 20
+</span><span class=lnt> 21
+</span><span class=lnt> 22
+</span><span class=lnt> 23
+</span><span class=lnt> 24
+</span><span class=lnt> 25
+</span><span class=lnt> 26
+</span><span class=lnt> 27
+</span><span class=lnt> 28
+</span><span class=lnt> 29
+</span><span class=lnt> 30
+</span><span class=lnt> 31
+</span><span class=lnt> 32
+</span><span class=lnt> 33
+</span><span class=lnt> 34
+</span><span class=lnt> 35
+</span><span class=lnt> 36
+</span><span class=lnt> 37
+</span><span class=lnt> 38
+</span><span class=lnt> 39
+</span><span class=lnt> 40
+</span><span class=lnt> 41
+</span><span class=lnt> 42
+</span><span class=lnt> 43
+</span><span class=lnt> 44
+</span><span class=lnt> 45
+</span><span class=lnt> 46
+</span><span class=lnt> 47
+</span><span class=lnt> 48
+</span><span class=lnt> 49
+</span><span class=lnt> 50
+</span><span class=lnt> 51
+</span><span class=lnt> 52
+</span><span class=lnt> 53
+</span><span class=lnt> 54
+</span><span class=lnt> 55
+</span><span class=lnt> 56
+</span><span class=lnt> 57
+</span><span class=lnt> 58
+</span><span class=lnt> 59
+</span><span class=lnt> 60
+</span><span class=lnt> 61
+</span><span class=lnt> 62
+</span><span class=lnt> 63
+</span><span class=lnt> 64
+</span><span class=lnt> 65
+</span><span class=lnt> 66
+</span><span class=lnt> 67
+</span><span class=lnt> 68
+</span><span class=lnt> 69
+</span><span class=lnt> 70
+</span><span class=lnt> 71
+</span><span class=lnt> 72
+</span><span class=lnt> 73
+</span><span class=lnt> 74
+</span><span class=lnt> 75
+</span><span class=lnt> 76
+</span><span class=lnt> 77
+</span><span class=lnt> 78
+</span><span class=lnt> 79
+</span><span class=lnt> 80
+</span><span class=lnt> 81
+</span><span class=lnt> 82
+</span><span class=lnt> 83
+</span><span class=lnt> 84
+</span><span class=lnt> 85
+</span><span class=lnt> 86
+</span><span class=lnt> 87
+</span><span class=lnt> 88
+</span><span class=lnt> 89
+</span><span class=lnt> 90
+</span><span class=lnt> 91
+</span><span class=lnt> 92
+</span><span class=lnt> 93
+</span><span class=lnt> 94
+</span><span class=lnt> 95
+</span><span class=lnt> 96
+</span><span class=lnt> 97
+</span><span class=lnt> 98
+</span><span class=lnt> 99
+</span><span class=lnt>100
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-cpp data-lang=cpp><span class=line><span class=cl><span class=kt>void</span> <span class=n>VLIWPacketizerList</span><span class=o>::</span><span class=n>PacketizeMIs</span><span class=p>(</span><span class=n>MachineBasicBlock</span> <span class=o>*</span><span class=n>MBB</span><span class=p>,</span>
+</span></span><span class=line><span class=cl>                                      <span class=n>MachineBasicBlock</span><span class=o>::</span><span class=n>iterator</span> <span class=n>BeginItr</span><span class=p>,</span>
+</span></span><span class=line><span class=cl>                                      <span class=n>MachineBasicBlock</span><span class=o>::</span><span class=n>iterator</span> <span class=n>EndItr</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>  <span class=n>assert</span><span class=p>(</span><span class=n>VLIWScheduler</span> <span class=o>&amp;&amp;</span> <span class=s>&#34;VLIW Scheduler is not initialized!&#34;</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>  <span class=c1>// 准备调度执行。
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=n>VLIWScheduler</span><span class=o>-&gt;</span><span class=n>startBlock</span><span class=p>(</span><span class=n>MBB</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>  <span class=c1>// 为新调度区域初始化 DAG 和通用调度器状态。
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=c1>// 这实际上并不创建 DAG，只是清除它。
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=c1>// 调度驱动程序可在每个调度区域多次调用 BuildSchedGraph。
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=n>VLIWScheduler</span><span class=o>-&gt;</span><span class=n>enterRegion</span><span class=p>(</span><span class=n>MBB</span><span class=p>,</span> <span class=n>BeginItr</span><span class=p>,</span> <span class=n>EndItr</span><span class=p>,</span>
+</span></span><span class=line><span class=cl>                             <span class=n>std</span><span class=o>::</span><span class=n>distance</span><span class=p>(</span><span class=n>BeginItr</span><span class=p>,</span> <span class=n>EndItr</span><span class=p>));</span>
+</span></span><span class=line><span class=cl>  <span class=n>VLIWScheduler</span><span class=o>-&gt;</span><span class=n>schedule</span><span class=p>();</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>  <span class=n>LLVM_DEBUG</span><span class=p>({</span>
+</span></span><span class=line><span class=cl>    <span class=n>dbgs</span><span class=p>()</span> <span class=o>&lt;&lt;</span> <span class=s>&#34;Scheduling DAG of the packetize region</span><span class=se>\n</span><span class=s>&#34;</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>    <span class=n>VLIWScheduler</span><span class=o>-&gt;</span><span class=n>dump</span><span class=p>();</span>
+</span></span><span class=line><span class=cl>  <span class=p>});</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>  <span class=c1>// 生成机器指令到调度单元的映射。
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=n>MIToSUnit</span><span class=p>.</span><span class=n>clear</span><span class=p>();</span>
+</span></span><span class=line><span class=cl>  <span class=k>for</span> <span class=p>(</span><span class=n>SUnit</span> <span class=o>&amp;</span><span class=nl>SU</span> <span class=p>:</span> <span class=n>VLIWScheduler</span><span class=o>-&gt;</span><span class=n>SUnits</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>    <span class=n>MIToSUnit</span><span class=p>[</span><span class=n>SU</span><span class=p>.</span><span class=n>getInstr</span><span class=p>()]</span> <span class=o>=</span> <span class=o>&amp;</span><span class=n>SU</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>  <span class=kt>bool</span> <span class=n>LimitPresent</span> <span class=o>=</span> <span class=n>InstrLimit</span><span class=p>.</span><span class=n>getPosition</span><span class=p>();</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>  <span class=c1>// 打包。
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=k>for</span> <span class=p>(;</span> <span class=n>BeginItr</span> <span class=o>!=</span> <span class=n>EndItr</span><span class=p>;</span> <span class=o>++</span><span class=n>BeginItr</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>    <span class=k>if</span> <span class=p>(</span><span class=n>LimitPresent</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>      <span class=k>if</span> <span class=p>(</span><span class=n>InstrCount</span> <span class=o>&gt;=</span> <span class=n>InstrLimit</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>        <span class=n>EndItr</span> <span class=o>=</span> <span class=n>BeginItr</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>        <span class=k>break</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>      <span class=p>}</span>
+</span></span><span class=line><span class=cl>      <span class=n>InstrCount</span><span class=o>++</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>    <span class=p>}</span>
+</span></span><span class=line><span class=cl>    <span class=n>MachineInstr</span> <span class=o>&amp;</span><span class=n>MI</span> <span class=o>=</span> <span class=o>*</span><span class=n>BeginItr</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>    <span class=n>initPacketizerState</span><span class=p>();</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>    <span class=c1>// 如果需要结束当前打包。
+</span></span></span><span class=line><span class=cl><span class=c1></span>    <span class=k>if</span> <span class=p>(</span><span class=n>isSoloInstruction</span><span class=p>(</span><span class=n>MI</span><span class=p>))</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>      <span class=n>endPacket</span><span class=p>(</span><span class=n>MBB</span><span class=p>,</span> <span class=n>MI</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>      <span class=k>continue</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>    <span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>    <span class=c1>// 忽视伪指令。
+</span></span></span><span class=line><span class=cl><span class=c1></span>    <span class=k>if</span> <span class=p>(</span><span class=n>ignorePseudoInstruction</span><span class=p>(</span><span class=n>MI</span><span class=p>,</span> <span class=n>MBB</span><span class=p>))</span>
+</span></span><span class=line><span class=cl>      <span class=k>continue</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>    <span class=n>SUnit</span> <span class=o>*</span><span class=n>SUI</span> <span class=o>=</span> <span class=n>MIToSUnit</span><span class=p>[</span><span class=o>&amp;</span><span class=n>MI</span><span class=p>];</span>
+</span></span><span class=line><span class=cl>    <span class=n>assert</span><span class=p>(</span><span class=n>SUI</span> <span class=o>&amp;&amp;</span> <span class=s>&#34;Missing SUnit Info!&#34;</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>    <span class=c1>// 询问DFA该机器指令所需资源是否可获取。
+</span></span></span><span class=line><span class=cl><span class=c1></span>    <span class=n>LLVM_DEBUG</span><span class=p>(</span><span class=n>dbgs</span><span class=p>()</span> <span class=o>&lt;&lt;</span> <span class=s>&#34;Checking resources for adding MI to packet &#34;</span> <span class=o>&lt;&lt;</span> <span class=n>MI</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>    <span class=kt>bool</span> <span class=n>ResourceAvail</span> <span class=o>=</span> <span class=n>ResourceTracker</span><span class=o>-&gt;</span><span class=n>canReserveResources</span><span class=p>(</span><span class=n>MI</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>    <span class=n>LLVM_DEBUG</span><span class=p>({</span>
+</span></span><span class=line><span class=cl>      <span class=k>if</span> <span class=p>(</span><span class=n>ResourceAvail</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>        <span class=n>dbgs</span><span class=p>()</span> <span class=o>&lt;&lt;</span> <span class=s>&#34;  Resources are available for adding MI to packet</span><span class=se>\n</span><span class=s>&#34;</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>      <span class=k>else</span>
+</span></span><span class=line><span class=cl>        <span class=nf>dbgs</span><span class=p>()</span> <span class=o>&lt;&lt;</span> <span class=s>&#34;  Resources NOT available</span><span class=se>\n</span><span class=s>&#34;</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>    <span class=p>});</span>
+</span></span><span class=line><span class=cl>    <span class=k>if</span> <span class=p>(</span><span class=n>ResourceAvail</span> <span class=o>&amp;&amp;</span> <span class=n>shouldAddToPacket</span><span class=p>(</span><span class=n>MI</span><span class=p>))</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>      <span class=c1>// 检查当前指令和包中指令依赖关系。
+</span></span></span><span class=line><span class=cl><span class=c1></span>      <span class=k>for</span> <span class=p>(</span><span class=k>auto</span> <span class=o>*</span><span class=nl>MJ</span> <span class=p>:</span> <span class=n>CurrentPacketMIs</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>        <span class=n>SUnit</span> <span class=o>*</span><span class=n>SUJ</span> <span class=o>=</span> <span class=n>MIToSUnit</span><span class=p>[</span><span class=n>MJ</span><span class=p>];</span>
+</span></span><span class=line><span class=cl>        <span class=n>assert</span><span class=p>(</span><span class=n>SUJ</span> <span class=o>&amp;&amp;</span> <span class=s>&#34;Missing SUnit Info!&#34;</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>        <span class=n>LLVM_DEBUG</span><span class=p>(</span><span class=n>dbgs</span><span class=p>()</span> <span class=o>&lt;&lt;</span> <span class=s>&#34;  Checking against MJ &#34;</span> <span class=o>&lt;&lt;</span> <span class=o>*</span><span class=n>MJ</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>        <span class=c1>// 打包SUI和SUJ是否合法。
+</span></span></span><span class=line><span class=cl><span class=c1></span>        <span class=k>if</span> <span class=p>(</span><span class=o>!</span><span class=n>isLegalToPacketizeTogether</span><span class=p>(</span><span class=n>SUI</span><span class=p>,</span> <span class=n>SUJ</span><span class=p>))</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>          <span class=n>LLVM_DEBUG</span><span class=p>(</span><span class=n>dbgs</span><span class=p>()</span> <span class=o>&lt;&lt;</span> <span class=s>&#34;  Not legal to add MI, try to prune</span><span class=se>\n</span><span class=s>&#34;</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>          <span class=c1>// 如果依赖可以被剪枝则打包。
+</span></span></span><span class=line><span class=cl><span class=c1></span>          <span class=k>if</span> <span class=p>(</span><span class=o>!</span><span class=n>isLegalToPruneDependencies</span><span class=p>(</span><span class=n>SUI</span><span class=p>,</span> <span class=n>SUJ</span><span class=p>))</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>            <span class=c1>// 如果依赖不能剪枝则结束打包。
+</span></span></span><span class=line><span class=cl><span class=c1></span>            <span class=n>LLVM_DEBUG</span><span class=p>(</span><span class=n>dbgs</span><span class=p>()</span>
+</span></span><span class=line><span class=cl>                       <span class=o>&lt;&lt;</span> <span class=s>&#34;  Could not prune dependencies for adding MI</span><span class=se>\n</span><span class=s>&#34;</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>            <span class=n>endPacket</span><span class=p>(</span><span class=n>MBB</span><span class=p>,</span> <span class=n>MI</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>            <span class=k>break</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>          <span class=p>}</span>
+</span></span><span class=line><span class=cl>          <span class=n>LLVM_DEBUG</span><span class=p>(</span><span class=n>dbgs</span><span class=p>()</span> <span class=o>&lt;&lt;</span> <span class=s>&#34;  Pruned dependence for adding MI</span><span class=se>\n</span><span class=s>&#34;</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>        <span class=p>}</span>
+</span></span><span class=line><span class=cl>      <span class=p>}</span>
+</span></span><span class=line><span class=cl>    <span class=p>}</span> <span class=k>else</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>      <span class=n>LLVM_DEBUG</span><span class=p>(</span><span class=k>if</span> <span class=p>(</span><span class=n>ResourceAvail</span><span class=p>)</span> <span class=n>dbgs</span><span class=p>()</span>
+</span></span><span class=line><span class=cl>                 <span class=o>&lt;&lt;</span> <span class=s>&#34;Resources are available, but instruction should not be &#34;</span>
+</span></span><span class=line><span class=cl>                    <span class=s>&#34;added to packet</span><span class=se>\n</span><span class=s>  &#34;</span>
+</span></span><span class=line><span class=cl>                 <span class=o>&lt;&lt;</span> <span class=n>MI</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>      <span class=c1>// 如果资源不可获取或指令不能加入当前包则结束打包。
+</span></span></span><span class=line><span class=cl><span class=c1></span>      <span class=n>endPacket</span><span class=p>(</span><span class=n>MBB</span><span class=p>,</span> <span class=n>MI</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>    <span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>    <span class=c1>// 添加MI到当前包。
+</span></span></span><span class=line><span class=cl><span class=c1></span>    <span class=n>LLVM_DEBUG</span><span class=p>(</span><span class=n>dbgs</span><span class=p>()</span> <span class=o>&lt;&lt;</span> <span class=s>&#34;* Adding MI to packet &#34;</span> <span class=o>&lt;&lt;</span> <span class=n>MI</span> <span class=o>&lt;&lt;</span> <span class=sc>&#39;\n&#39;</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>    <span class=n>BeginItr</span> <span class=o>=</span> <span class=n>addToPacket</span><span class=p>(</span><span class=n>MI</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>  <span class=p>}</span> <span class=c1>// 对于打包范围的所有指令。
+</span></span></span><span class=line><span class=cl><span class=c1></span>
+</span></span><span class=line><span class=cl>  <span class=c1>// 结束任何遗留的数据包。
+</span></span></span><span class=line><span class=cl><span class=c1></span>  <span class=n>endPacket</span><span class=p>(</span><span class=n>MBB</span><span class=p>,</span> <span class=n>EndItr</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>  <span class=n>VLIWScheduler</span><span class=o>-&gt;</span><span class=n>exitRegion</span><span class=p>();</span>
+</span></span><span class=line><span class=cl>  <span class=n>VLIWScheduler</span><span class=o>-&gt;</span><span class=n>finishBlock</span><span class=p>();</span>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span></code></pre></td></tr></table></div></div><h4 id=getresourcetracker>getResourceTracker</h4><p>返回ResourceTracker。</p><h4 id=addmutation-1>addMutation</h4><p>在打包开始前，增加一次 DAG 突变。</p><h4 id=alias>alias</h4><p><code>public</code></p><h4 id=alias-1>alias</h4><p><code>private</code></p><h3 id=目标相关函数>目标相关函数</h3><h4 id=vliwpacketizerlist-2>~VLIWPacketizerList()</h4><p>析构函数</p><h4 id=addtopacket>addToPacket</h4><p>添加指令到当前包。<strong>（存在默认实现）</strong></p><p>#Todo</p><h4 id=endpacket>endPacket</h4><p>结束当前打包并且重置打包器的状态，覆盖当前函数允许确切目标打包器执行自定义最终处理。<strong>（存在默认实现）</strong></p><p>#Todo</p><h4 id=initpacketizerstate>initPacketizerState</h4><p>在将指令打包之前执行初始化。该函数应由依赖于目标的打包器覆盖。</p><p>#Todo</p><h4 id=ignorepseudoinstruction>ignorePseudoInstruction</h4><p>检查是否给定的指令应当被打包器忽视。</p><p>#Todo</p><h4 id=issoloinstruction>isSoloInstruction</h4><p>若当前指令不能和任意一个指令打包，则返回true，这意味着当前指令独自为一个包。</p><p>#Todo</p><h4 id=shouldaddtopacket>shouldAddToPacket</h4><p>检查打包器是否应该尝试将给定的指令添加到当前数据包中。
+可能不希望将指令包含在当前数据包中的原因之一是，它可能导致停滞。
+如果这个函数返回 &ldquo;false&rdquo;，则当前数据包将结束，并且该指令将被添加到下一个数据包中。</p><p>#Todo</p><h4 id=islegaltopacketizetogether>isLegalToPacketizeTogether</h4><p>检查将 SUI 和 SUJ 打包在一起是否合法。</p><p>#Todo</p><h4 id=islegaltoprunedependencies>isLegalToPruneDependencies</h4><p>检查剪枝 SUI 和 SUJ 之间的依赖是否合法。</p><p>#Todo</p></div><div class=post-footer id=post-footer><div class=post-info><div class=post-info-line><div class=post-info-mod><span>Updated on 2024-09-03</span></div></div><div class=post-info-line><div class=post-info-md></div><div class=post-info-share><span><a href=javascript:void(0); title="Share on Twitter" data-sharer=twitter data-url=http://example.org/dfa_packetizer/ data-title="DFA Packetizer" data-via=xxxx data-hashtags=note,llvm-backend><i class="fab fa-twitter fa-fw" aria-hidden=true></i></a><a href=javascript:void(0); title="Share on Facebook" data-sharer=facebook data-url=http://example.org/dfa_packetizer/ data-hashtag=note><i class="fab fa-facebook-square fa-fw" aria-hidden=true></i></a><a href=javascript:void(0); title="Share on Hacker News" data-sharer=hackernews data-url=http://example.org/dfa_packetizer/ data-title="DFA Packetizer"><i class="fab fa-hacker-news fa-fw" aria-hidden=true></i></a><a href=javascript:void(0); title="Share on Line" data-sharer=line data-url=http://example.org/dfa_packetizer/ data-title="DFA Packetizer"><i data-svg-src=/lib/simple-icons/icons/line.min.svg aria-hidden=true></i></a><a href=javascript:void(0); title="Share on 微博" data-sharer=weibo data-url=http://example.org/dfa_packetizer/ data-title="DFA Packetizer"><i class="fab fa-weibo fa-fw" aria-hidden=true></i></a></span></div></div></div><div class=post-info-more><section class=post-tags><i class="fas fa-tags fa-fw" aria-hidden=true></i>&nbsp;<a href=/tags/note/>Note</a>,&nbsp;<a href=/tags/llvm-backend/>Llvm-Backend</a></section><section><span><a href=javascript:void(0); onclick=window.history.back()>Back</a></span>&nbsp;|&nbsp;<span><a href=/>Home</a></span></section></div><div class=post-nav><a href=/software_pipeliner/ class=prev rel=prev title="Software Pipeliner"><i class="fas fa-angle-left fa-fw" aria-hidden=true></i>Software Pipeliner</a>
+<a href=/vliw_packetizer/ class=next rel=next title="VLIW Packetizer">VLIW Packetizer<i class="fas fa-angle-right fa-fw" aria-hidden=true></i></a></div></div></article></div></main><footer class=footer><div class=footer-container><div class=footer-line>Powered by <a href=https://gohugo.io/ target=_blank rel="noopener noreffer" title="Hugo 0.133.1">Hugo</a> | Theme - <a href=https://github.com/dillonzq/LoveIt target=_blank rel="noopener noreffer" title="LoveIt 0.2.11"><i class="far fa-kiss-wink-heart fa-fw" aria-hidden=true></i> LoveIt</a></div><div class=footer-line itemscope itemtype=http://schema.org/CreativeWork><i class="far fa-copyright fa-fw" aria-hidden=true></i><span itemprop=copyrightYear>2024</span><span class=author itemprop=copyrightHolder>&nbsp;<a href=/ target=_blank>ChunyuYe</a></span>&nbsp;|&nbsp;<span class=license><a rel="license external nofollow noopener noreffer" href=https://creativecommons.org/licenses/by-nc/4.0/ target=_blank>CC BY-NC 4.0</a></span></div></div></footer></div><div id=fixed-buttons><a href=# id=back-to-top class=fixed-button title="Back to Top"><i class="fas fa-arrow-up fa-fw" aria-hidden=true></i>
+</a><a href=# id=view-comments class=fixed-button title="View Comments"><i class="fas fa-comment fa-fw" aria-hidden=true></i></a></div><link rel=stylesheet href=/lib/katex/katex.min.css><link rel=stylesheet href=/lib/cookieconsent/cookieconsent.min.css><script type=text/javascript src=/lib/autocomplete/autocomplete.min.js></script><script type=text/javascript src=/lib/lunr/lunr.min.js></script><script type=text/javascript src=/lib/lazysizes/lazysizes.min.js></script><script type=text/javascript src=/lib/clipboard/clipboard.min.js></script><script type=text/javascript src=/lib/sharer/sharer.min.js></script><script type=text/javascript src=/lib/katex/katex.min.js></script><script type=text/javascript src=/lib/katex/contrib/auto-render.min.js></script><script type=text/javascript src=/lib/katex/contrib/copy-tex.min.js></script><script type=text/javascript src=/lib/katex/contrib/mhchem.min.js></script><script type=text/javascript src=/lib/cookieconsent/cookieconsent.min.js></script><script type=text/javascript>window.config={code:{copyTitle:"Copy to clipboard",maxShownLines:50},comment:{},cookieconsent:{content:{dismiss:"Got it!",link:"Learn more",message:"This website uses Cookies to improve your experience."},enable:!0,palette:{button:{background:"#f0f0f0"},popup:{background:"#1aa3ff"}},theme:"edgeless"},math:{delimiters:[{display:!0,left:"$$",right:"$$"},{display:!0,left:"\\[",right:"\\]"},{display:!0,left:"\\begin{equation}",right:"\\end{equation}"},{display:!0,left:"\\begin{equation*}",right:"\\end{equation*}"},{display:!0,left:"\\begin{align}",right:"\\end{align}"},{display:!0,left:"\\begin{align*}",right:"\\end{align*}"},{display:!0,left:"\\begin{alignat}",right:"\\end{alignat}"},{display:!0,left:"\\begin{alignat*}",right:"\\end{alignat*}"},{display:!0,left:"\\begin{gather}",right:"\\end{gather}"},{display:!0,left:"\\begin{CD}",right:"\\end{CD}"},{display:!1,left:"$",right:"$"},{display:!1,left:"\\(",right:"\\)"}],strict:!1},search:{highlightTag:"em",lunrIndexURL:"/index.json",maxResultLength:10,noResultsFound:"No results found",snippetLength:30,type:"lunr"}}</script><script type=text/javascript src=/js/theme.min.js></script></body></html>
