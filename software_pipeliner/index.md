@@ -14,6 +14,9 @@ Swing Modulo Scheduling (SMS， 摇摆模调度) 是一种软件流水线技术
 | ResMII(Resource MII)             | 根据一次循环所需的功能单元(FU, function unit)去除以机器所有功能单元的结果。如果循环中包含多类FU的使用(且每类FU之间相互无法替换)，则ResMII是分别对每一类FU计算ResMII后的最大值。 |
 | RecMII(Recurrence MII)           | 循环中环路完成一次迭代所需的最小间隔，如果循环存在多条数据链路则分别计算后取其最大值。                                                                 |
 
+**软件流水循环执行模型：**
+![SMS_Software_Pipeliner.png](https://s2.loli.net/2024/07/31/AV7bWoInFXBaU5M.png)
+
 ## SMS算法
 ### 依赖图的计算和分析
 依赖图包含四个部分：
@@ -24,6 +27,7 @@ Swing Modulo Scheduling (SMS， 摇摆模调度) 是一种软件流水线技术
 | E         | 依赖图边的集合，表示依赖关系，SMS中仅存在数据依赖，(u,v)表示v依赖于u。 |
 | $δ_(u,v)$ | 距离函数。                                    |
 | $λ_u$     | 延迟函数，表示相应操作（顶点）所花费的周期数。                  |
+
 附加函数：
 
 | 属性                              | 含义                                     |
